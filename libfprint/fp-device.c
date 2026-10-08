@@ -919,7 +919,25 @@ fp_device_close (FpDevice           *device,
       return;
     }
 
-  if (priv->current_task || priv->is_suspended)
+  if (priv->current_task)
+    {
+      g_task_return_error (task,
+                           fpi_device_error_new (FP_DEVICE_ERROR_BUSY));
+      return;
+    }
+
+  /* Allow closing a suspended device: suspend has already cancelled and
+   * finished every running action, so refusing the close here would leave
+   * the device permanently stuck in the open state (no one retries the
+   * close after resume — the D-Bus client session is gone by then).
+   * fpi_device_resume_complete() clears is_suspended before the driver
+   * close handler runs. */
+  if (priv->is_suspended && !priv->suspend_resume_task)
+    {
+      priv->is_suspended = FALSE;
+      g_debug ("Closing device while it was suspended, resuming implicitly");
+    }
+  else if (priv->is_suspended)
     {
       g_task_return_error (task,
                            fpi_device_error_new (FP_DEVICE_ERROR_BUSY));
@@ -1051,10 +1069,18 @@ fp_device_resume (FpDevice           *device,
 
   task = g_task_new (device, cancellable, callback, user_data);
 
-  if (priv->suspend_resume_task || !priv->is_suspended)
+  if (priv->suspend_resume_task)
     {
       g_task_return_error (task,
                            fpi_device_error_new (FP_DEVICE_ERROR_BUSY));
+      return;
+    }
+
+  /* Idempotent resume: a device that was closed while suspended is no
+   * longer suspended; resuming it is a no-op, not an error. */
+  if (!priv->is_suspended)
+    {
+      g_task_return_boolean (task, TRUE);
       return;
     }
 

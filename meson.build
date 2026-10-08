@@ -147,7 +147,8 @@ default_drivers = [
 ]
 
 spi_drivers = [
-    'elanspi'
+    'elanspi',
+    'fte7001'
 ]
 
 if have_spi
@@ -211,6 +212,7 @@ driver_helper_mapping = {
     'aes4000' : [ 'aeslib', 'aes3k' ],
     'uru4000' : [ 'openssl' ],
     'elanspi' : [ 'udev' ],
+    'fte7001' : [ 'udev', 'gpiod' ],
     'virtual_image'          : [ 'virtual' ],
     'virtual_device'         : [ 'virtual' ],
     'virtual_device_storage' : [ 'virtual' ],
@@ -284,6 +286,15 @@ foreach i : driver_helpers
         libfprint_conf.set10('HAVE_UDEV', true)
 
         optional_deps += gudev_dep
+    elif i == 'gpiod'
+        gpiod_dep = dependency('libgpiod', version: '>= 2.0', required: false)
+        if not gpiod_dep.found()
+            error('libgpiod >= 2.0 is required for @0@ and possibly others'.format(driver))
+        endif
+
+        libfprint_conf.set10('HAVE_GPIOD', true)
+
+        optional_deps += gpiod_dep
     endif
 endforeach
 

@@ -1,0 +1,45 @@
+name: build-and-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm \
+            base-devel git meson ninja gcc \
+            glib2 glib2-devel libgpiod libgusb libusb libgudev \
+            json-glib cairo pixman openssl gtk3 \
+            gobject-introspection
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Meson setup
+        run: |
+          meson setup build \
+            -Ddrivers=fte7001 \
+            -Dudev_rules=disabled \
+            -Dintrospection=false \
+            -Ddoc=false \
+            -Dgtk-examples=false
+      - name: Build
+        run: ninja -C build
+
+  matcher-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build and run matcher regression test
+        run: |
+          gcc -O2 -Wall -I libfprint/drivers \
+            -o /tmp/matcher-test \
+            tests/fte7001/matcher-test.c \
+            libfprint/drivers/fte7001-matcher.c -lm
+          /tmp/matcher-test

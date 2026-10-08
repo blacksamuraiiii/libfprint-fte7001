@@ -135,6 +135,8 @@ driver_sources = {
         [ 'drivers/elanmoc/elanmoc.c' ],
     'elanspi' :
         [ 'drivers/elanspi.c' ],
+    'fte7001' :
+        [ 'drivers/fte7001.c', 'drivers/fte7001-matcher.c' ],
     'nb1010' :
         [ 'drivers/nb1010.c' ],
     'virtual_image' :
@@ -165,6 +167,8 @@ helper_sources = {
     'openssl' :
         [ ],
     'udev' :
+        [ ],
+    'gpiod' :
         [ ],
     'virtual' :
         [ 'drivers/virtual-device-listener.c' ],

@@ -1,5 +1,76 @@
+# FocalTech FTE7001 / FT9338 Linux Driver (downstream libfprint)
 
+> **Downstream tree** based on the official libfprint `v1.94.10` release,
+> adding support for the FocalTech **FT9338** fingerprint sensor
+> (ACPI `_HID`: **FTE7001**, found in the One Mix 3 and similar
+> Cherry Trail / Braswell tablets).
+>
+> The delta against upstream is intentionally small and reviewable:
+>
+> - `libfprint/drivers/fte7001.c` / `fte7001.h` — FpDevice driver:
+>   cold-boot firmware upload (volatile RAM firmware), pure-5B polling
+>   with suspend soft-wake watchdog and double-frame finger confirmation.
+> - `libfprint/drivers/fte7001-matcher.c` / `.h` — self-contained
+>   keypoint matcher (DoG + descriptors + RANSAC, pure C99, no GLib),
+>   calibrated on the real sensor (leave-one-out: genuine min 13.1,
+>   impostor max 3.1, threshold 7.0). The sensor is 88×88 and yields
+>   ~1 NBIS minutia per frame, so the FpImageDevice+NBIS path cannot
+>   work; the driver therefore implements enroll/verify itself.
+> - `libfprint/drivers/ft9338-firmware.inc` — vendor firmware blob
+>   (see licensing note in the file header).
+> - SPI core additions (backported from the fte3600 downstream fork):
+>   `fpi_spi_transfer_set_full_duplex()` for single-CS full-duplex
+>   transfers, `fpi_spi_transfer_set_sensitive()` to redact biometric
+>   data from debug logs, and `fpi_print_get_type()`.
+> - Device core: allow `fp_device_close()` on a suspended device. Suspend
+>   has already cancelled every running action, so refusing the close
+>   left the device permanently stuck open after a suspend that
+>   interrupted a verify (observed: lock-screen fingerprint became
+>   silently dead until fprintd was restarted). Resume is now idempotent.
+> - Meson registration of the `fte7001` SPI driver (needs libgpiod ≥ 2.0
+>   for the reset GPIO).
+> - `tests/fte7001/` — standalone matcher regression test (synthetic
+>     fixtures only, no biometric data).
+>
+> Everything else is pristine upstream libfprint; see the upstream
+> README below. This tree supersedes the earlier
+> `fte7001-linux-driver` repository (up to its v2.0), which built
+> against a third-party fork; releases here continue that version
+> line (starting at v2.1) while tracking official libfprint releases
+> directly.
 
+## Build
+
+```bash
+meson setup build -Ddrivers=fte7001 -Dudev_rules=disabled \
+    -Dintrospection=false -Ddoc=false --prefix=/usr
+ninja -C build
+```
+
+Requirements: libgpiod ≥ 2.0 plus the usual libfprint dependencies.
+Install the built `libfprint-2.so` with your distribution's stock
+fprintd (1.94.x) — fprintd itself is not patched.
+
+The spidev buffer size must be raised (e.g. `spidev bufsiz=65536`
+in `/etc/modprobe.d/spidev.conf`) for the 7.5 KB image transfers.
+
+## Matcher test
+
+```bash
+gcc -O2 -Wall -I libfprint/drivers -o /tmp/matcher-test \
+    tests/fte7001/matcher-test.c libfprint/drivers/fte7001-matcher.c -lm
+/tmp/matcher-test
+```
+
+---
+
+<div align="center">
+
+# LibFPrint
+
+*LibFPrint is part of the **[FPrint][Website]** project.*
+
+<br/>
 <div align="center">
 
 # LibFPrint
